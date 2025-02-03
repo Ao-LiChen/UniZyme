@@ -29,7 +29,7 @@ num_attention_heads = 2
 num_transformer_layers = 1  # 多层 Attention
 K=10
 
-ClipZymeFeature=torch.load("ClipZyme_Feature.pt")
+ClipZymeFeature=torch.load("../Data_Split/ClipZyme_Feature.pt")
 
 
 def my_collate_fn(batch):
