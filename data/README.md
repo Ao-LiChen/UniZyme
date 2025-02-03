@@ -1,0 +1,5 @@
+- **Data_split**: Contains the division of training and testing data, as well as benchmark datasets.
+- **Enzyme_Energy** and **Energy_Structure**: Contain the PDB structures of enzymes and their pre-computed energy data.
+- **OriginalData**: Contains the raw data obtained from Merops and Uniprot.
+- **Pretrain_Enzyme**: Includes the enzyme structures and energy data required for the pretraining phase.
+- **Substrate_Structures**: Contains the structural data of substrates.

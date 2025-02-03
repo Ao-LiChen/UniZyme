@@ -1,0 +1,34 @@
+name: UniZyme
+channels:
+  - pytorch
+  - nvidia
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free
+  - defaults
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - python=3.8
+  - pytorch=2.4.1
+  - pytorch-cuda=12.4
+  - pytorch-mutex=1.0
+  - numpy=1.24.3
+  - biopython=1.78
+  - pandas=2.0.3
+  - scipy=1.10.1
+  - scikit-learn=1.3.0
+  - matplotlib=3.7.2
+  - torchaudio=2.4.1
+  - torchvision=0.19.1
+  - cuda-cudart=12.4.127
+  - cuda-libraries=12.4.1
+  - cudatoolkit=12.4
+  - openmp=2023.1.0
+  - joblib=1.4.2
+  - tqdm=4.64.1
+  - pyyaml=6.0.2
+  - setuptools=75.1.0
+  - wheel=0.44.0
+  - requests=2.32.3
+  - tqdm=4.64.1
+  - jinja2=3.1.4
+  - pip=24.2
