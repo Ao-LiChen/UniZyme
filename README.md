@@ -49,3 +49,15 @@ The output will be generated and saved in the `output_seq` folder as **.csv** fi
 To test the model and obtain prediction results on various benchmarks:
 ```bash
 python code/Test_UniZyme.py
+```
+
+## Running Predictions for Specific Input
+To predict cleavage sites for a specific enzyme-substrate pair, use the following command:
+```bash
+python code/predict.py \
+  --enzyme_pdb Enzyme.pdb \
+  --substrate_pdb Substrate.pdb \
+  --enzyme_seq "MKWLLLLSLVVLSECLVKVPLVRKKSLRQNLIKNGKLKDFLKTHKHNPASKYFPEAAALIGDEPLENYLDTEYFGTIGIGTPAQDFTVIFDTGSSNLWVPSVYCSSLACSDHNQFNPDDSSTFEATSQELSITYGTGSMTGILGYDTVQVGGISDTNQIFGLSETEPGSFLYYAPFDGILGLAYPSISASGATPVFDNLWDQGLVSQDLFSVYLSSNDDSGSVVLLGGIDSSYYTGSLNWVPVSVEGYWQITLDSITMDGETIACSGGCQAIVDTGTSLLTGPTSAIANIQSDIGASENSDGEMVISCSSIDSLPDIVFTINGVQYPLSPSAYILQDDDSCTSGFEGMDVPTSSGELWILGDVFIRQYYTVFDRANNKVGLAPVA" \
+  --substrate_seq "MGDVEKGKKIFVQKCAQCHTVEKGGKHKTGPNLHGLFGRKTGQAPGFTYTDANKNKGITWKEETLMEYLENPKKYIPGTKMIFAGIKKKTEREDLIAYLKKATNE" \
+  --output predictions.csv
+  ```
