@@ -489,8 +489,9 @@ def predict(enzyme_pdb, substrate_pdb, enzyme_seq, substrate_seq, model):
             torch.tensor(energy_matrix, dtype=torch.float).unsqueeze(0).to(device),
             create_mask(len(enzyme_seq))
         )
-
-    return cleavage.squeeze().cpu().numpy()
+    substrate_length = len(substrate_seq)
+    predictions = cleavage.squeeze().cpu().numpy()[:substrate_length]
+    return predictions
 
 
 def main():
