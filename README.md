@@ -37,7 +37,7 @@ To train the models, use the following scripts:
     ```
 - **ClipZyme-Variant** (based on enzyme features extracted from ClipZyme):
     ```bash
-    python train_ClipZyme-Variant.py
+    python code/train_ClipZyme-Variant.py
     ```
 
 The output will be generated and saved in the `output_seq` folder as **.csv** files containing the filtered CDR3B sequences.
