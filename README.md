@@ -24,6 +24,9 @@ Follow the steps below to set up the environment for **UniZyme**:
     conda env create -f UniZyme.yml
     ```
 
+4. To install the **Frustratometer** library, refer to the instructions provided in the repository: [Frustratometer](https://github.com/HanaJaafari/Frustratometer).
+
+
 ## Training
 To train the models, use the following scripts:
 
