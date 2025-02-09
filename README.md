@@ -14,7 +14,7 @@ The datasets and model weights used in the paper can be found at: [Data and Mode
 Follow the steps below to set up the environment for **UniZyme**:
 
 1. **Install Anaconda** or **Miniconda**.
-2. Create a new conda environment and install pytorch:
+2. Create a new conda environment and install pytorch, pdbfixer:
     ```bash
     conda create -n UniZyme python=3.8
     conda activate UniZyme
