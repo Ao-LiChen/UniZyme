@@ -8,7 +8,7 @@ This repository contains the code and data for **UniZyme**, a tool designed to p
 ![UniZyme Framework](framework.png)
 
 ## Data and Model Weights
-The datasets and model weights used in the paper can be found at: [Data and Model Weights](https://zenodo.org/records/14795708).
+The datasets and model weights used in the paper can be found at: [Data and Model Weights](https://zenodo.org/records/14841050).
 
 ## Dependencies
 Follow the steps below to set up the environment for **UniZyme**:
