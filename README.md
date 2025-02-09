@@ -14,18 +14,25 @@ The datasets and model weights used in the paper can be found at: [Data and Mode
 Follow the steps below to set up the environment for **UniZyme**:
 
 1. **Install Anaconda** or **Miniconda**.
-2. Create a new conda environment with the following command:
+2. Create a new conda environment and install pytorch:
     ```bash
     conda create -n UniZyme python=3.8
     conda activate UniZyme
+    conda install pytorch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 pytorch-cuda=12.4 -c pytorch -c nvidia
+    conda install -c conda-forge pdbfixer
     ```
-3. Install the required dependencies using the provided `environment.yml` file:
+3. Install the required dependencies using the provided `requirements.txt` file:
     ```bash
-    conda env create -f UniZyme.yml
+    pip install -r requirements.txt
     ```
 
 4. To install the **Frustratometer** library, refer to the instructions provided in the repository: [Frustratometer](https://github.com/HanaJaafari/Frustratometer).
-
+    ```bash
+    git clone HanaJaafari/Frustratometer
+    cd Frustratometer
+    pip install -e .
+    ```
+   
 
 ## Training
 To train the models, use the following scripts:
@@ -54,7 +61,8 @@ python code/Test_UniZyme.py
 ## Running Predictions for Specific Input
 To predict cleavage sites for a specific enzyme-substrate pair, use the following command:
 ```bash
-python code/predict.py \
+cd code
+python predict.py \
   --enzyme_pdb Enzyme.pdb \
   --substrate_pdb Substrate.pdb \
   --enzyme_seq "MKWLLLLSLVVLSECLVKVPLVRKKSLRQNLIKNGKLKDFLKTHKHNPASKYFPEAAALIGDEPLENYLDTEYFGTIGIGTPAQDFTVIFDTGSSNLWVPSVYCSSLACSDHNQFNPDDSSTFEATSQELSITYGTGSMTGILGYDTVQVGGISDTNQIFGLSETEPGSFLYYAPFDGILGLAYPSISASGATPVFDNLWDQGLVSQDLFSVYLSSNDDSGSVVLLGGIDSSYYTGSLNWVPVSVEGYWQITLDSITMDGETIACSGGCQAIVDTGTSLLTGPTSAIANIQSDIGASENSDGEMVISCSSIDSLPDIVFTINGVQYPLSPSAYILQDDDSCTSGFEGMDVPTSSGELWILGDVFIRQYYTVFDRANNKVGLAPVA" \
