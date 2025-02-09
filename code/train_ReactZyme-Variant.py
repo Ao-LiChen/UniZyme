@@ -546,16 +546,16 @@ class Transformer_DE(nn.Module):
         return Activate_Site, Cleavage_Site
 
 
-with open("../Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
+with open("../data/Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
     enzyme_dict = pickle.load(f)
 
 
-substrate_dict = pickle.load(open("../Data_Split/substrate_uniprot_seq_1500_3t1.pkl", "rb"))
+substrate_dict = pickle.load(open("../data/Data_Split/substrate_uniprot_seq_1500_3t1.pkl", "rb"))
 
 
 # Load ESM-2 model
 esmmodel, alphabet = esm.pretrained.esm2_t12_35M_UR50D()
-esmmodel = nn.DataParallel(esmmodel, list(range(0,8)))
+esmmodel = nn.DataParallel(esmmodel, list(range(0,4)))
 batch_converter = alphabet.get_batch_converter()
 esmmodel.eval()
 
@@ -565,18 +565,18 @@ esmmodel = esmmodel.to(device)
 Transformer_DE = Transformer_DE(d_model=480, n_heads=num_attention_heads, n_layers=num_transformer_layers,K=K).to(device)
 
 
-Transformer_DE = nn.DataParallel(Transformer_DE, list(range(0,8)))
+Transformer_DE = nn.DataParallel(Transformer_DE, list(range(0,4)))
 
 
 optimizer = torch.optim.Adam(Transformer_DE.parameters(), lr=learning_rate)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.1, patience=1, verbose=True)
 early_stopping = EarlyStopping(patience=3, verbose=True)
 
-train_dataset = pickle.load(open("../Data_Split/train.pkl", "rb"))
+train_dataset = pickle.load(open("../data/Data_Split/train.pkl", "rb"))
 
 train_dataset_l = [[k, v] for k, v in train_dataset.items()]
 
-test_dataset = pickle.load(open("../Data_Split/test.pkl", "rb"))
+test_dataset = pickle.load(open("../data/Data_Split/test.pkl", "rb"))
 test_dataset_l = [[k, v] for k, v in test_dataset.items()]
 #test_dataset_l = [[k, v] for k, v in test_dataset.items() if random.random() < 0.0003]
 

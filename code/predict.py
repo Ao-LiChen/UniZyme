@@ -13,6 +13,9 @@ import math
 from torch.cuda.amp import autocast, GradScaler
 import pandas as pd
 import random
+import argparse
+import sys
+import frustratometer
 
 from pytorchtools import EarlyStopping
 
@@ -53,14 +56,16 @@ def get_ca_coordinates(pdb_file):
 
 
 # Create node features and distance matrix
-def create_distance(pdb_file):
+def create_distance(pdb_file,seq_len):
     ca_coords = get_ca_coordinates(pdb_file)
     num_nodes = ca_coords.shape[0]
     distances = distance_matrix(ca_coords, ca_coords)
     distances = 1 / (distances + 1)
     distances = torch.tensor(distances, dtype=torch.float)
     # distances[distances > distance_threshold] = 0  # Apply threshold
-    return distances
+
+
+    return torch.nn.functional.pad(distances, (0,max_len - seq_len,0, max_len - seq_len))
 
 
 class GaussianParameters(nn.Module):
@@ -414,7 +419,7 @@ class Transformer_DE(nn.Module):
         return Activate_Site, Cleavage_Site
 
 
-def calculate_energy_matrix(pdb_path):
+def calculate_energy_matrix(pdb_path, seq_len):
     """Calculate configurational frustration using frustratometer"""
     try:
         structure = frustratometer.Structure(pdb_path)
@@ -425,7 +430,10 @@ def calculate_energy_matrix(pdb_path):
             structure,
             **{k: v for k, v in calc_config.items() if k != 'kind'}
         )
-        return awsem.frustration(kind=calc_config['kind'])
+        flag = awsem.frustration(kind=calc_config['kind'])
+        print(flag.shape)
+        return torch.nn.functional.pad(torch.tensor(flag), (0,max_len - seq_len,0, max_len - seq_len))
+
     except Exception as e:
         print(f"Energy calculation failed: {str(e)}")
         return None
@@ -433,12 +441,12 @@ def calculate_energy_matrix(pdb_path):
 
 def predict(enzyme_pdb, substrate_pdb, enzyme_seq, substrate_seq, model):
     """Main prediction pipeline"""
-    energy_matrix = calculate_energy_matrix(enzyme_pdb)
+    energy_matrix = calculate_energy_matrix(enzyme_pdb,len(enzyme_seq))
     if energy_matrix is None:
         return None
 
-    enzyme_dist = create_distance(enzyme_pdb)
-    substrate_dist = create_distance(substrate_pdb)
+    enzyme_dist = create_distance(enzyme_pdb,len(enzyme_seq))
+    substrate_dist = create_distance(substrate_pdb,len(substrate_seq))
 
     # Process sequence features
     enzyme_data = [("enzyme", enzyme_seq)]
@@ -460,6 +468,8 @@ def predict(enzyme_pdb, substrate_pdb, enzyme_seq, substrate_seq, model):
         mask = torch.zeros(1, num_attention_heads, max_len, max_len)
         mask[..., :seq_len, :seq_len] = 1.0
         return mask.to(device)
+
+    print(substrate_feat.shape, substrate_dist.shape, enzyme_feat.shape, enzyme_dist.shape, energy_matrix.shape)
 
     with torch.no_grad():
         _, cleavage = model(
@@ -505,7 +515,16 @@ def main():
 
     # Initialize model
     model = Transformer_DE(d_model=480, n_heads=num_attention_heads, n_layers=1, K=10).to(device)
-    model.load_state_dict(torch.load(args.model_path, map_location=device))
+
+    state = torch.load(args.model_path, map_location=device)
+    new_state_dict = {}
+    for k, v in state.items():
+        name = k[7:]  # remove `module.`
+        new_state_dict[name] = v
+    model.load_state_dict(new_state_dict, strict=False)
+    del new_state_dict
+    del state
+
     model.eval()
 
     # Run prediction

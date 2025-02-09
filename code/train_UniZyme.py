@@ -15,7 +15,7 @@ import pandas as pd
 import random
 
 from pytorchtools import EarlyStopping
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,0,2,3,4,5,6,7"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "1,0,2,3,4,5,6,7"
 # Parameters
 distance_threshold = 8.0
 num_epochs = 10
@@ -565,7 +565,7 @@ class Transformer_DE(nn.Module):
 
 # Load data
 # Enzyme = os.listdir("/home/shuoyan/Chenao/FRUS/Enzyme/pdb_files")
-with open("../Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
+with open("../data/Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
     enzyme_dict = pickle.load(f)
 
 # new_enzyme_dict={}
@@ -575,12 +575,12 @@ with open("../Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
 # enzyme_dict=new_enzyme_dict
 
 # Substrate = os.listdir("/mnt/data2/Chenao/substrate_alphafold_structures")
-substrate_dict = pickle.load(open("../Data_Split/substrate_uniprot_seq_1500_3t1.pkl", "rb"))
+substrate_dict = pickle.load(open("../data/Data_Split/substrate_uniprot_seq_1500_3t1.pkl", "rb"))
 
 
 # Load ESM-2 model
 esmmodel, alphabet = esm.pretrained.esm2_t12_35M_UR50D()
-esmmodel = nn.DataParallel(esmmodel, list(range(0,8)))
+esmmodel = nn.DataParallel(esmmodel, list(range(0,4)))
 batch_converter = alphabet.get_batch_converter()
 esmmodel.eval()
 
@@ -607,7 +607,7 @@ del state
 
 
 
-Transformer_DE = nn.DataParallel(Transformer_DE, list(range(0,8)))
+Transformer_DE = nn.DataParallel(Transformer_DE, list(range(0,4)))
 
 # Crossmodel = CrossAttentionWithWeight(480).to(device)
 # Crossmodel = nn.DataParallel(Crossmodel, list(range(4)))
@@ -615,12 +615,12 @@ Transformer_DE = nn.DataParallel(Transformer_DE, list(range(0,8)))
 optimizer = torch.optim.Adam(Transformer_DE.parameters(), lr=learning_rate)
 early_stopping = EarlyStopping(patience=3, verbose=True)
 
-train_dataset = pickle.load(open("../Data_Split/train.pkl", "rb"))
+train_dataset = pickle.load(open("../data/Data_Split/train.pkl", "rb"))
 
 train_dataset_l = [[k, v] for k, v in train_dataset.items()]
 
 
-test_dataset = pickle.load(open("../Data_Split/test.pkl", "rb"))
+test_dataset = pickle.load(open("../data/Data_Split/test.pkl", "rb"))
 test_dataset_l = [[k, v] for k, v in test_dataset.items()]
 #test_dataset_l = [[k, v] for k, v in test_dataset.items() if random.random() < 0.0003]
 

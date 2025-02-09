@@ -15,7 +15,7 @@ import pandas as pd
 import random
 
 from pytorchtools import EarlyStopping
-os.environ["CUDA_VISIBLE_DEVICES"] = "1,0,2,3,4,5,6,7"
+#os.environ["CUDA_VISIBLE_DEVICES"] = "1,0,2,3,4,5,6,7"
 # Parameters
 distance_threshold = 8.0
 num_epochs = 10
@@ -574,7 +574,7 @@ class Transformer_DE(nn.Module):
 
 # Load data
 # Enzyme = os.listdir("/home/shuoyan/Chenao/FRUS/Enzyme/pdb_files")
-with open("../Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
+with open("../data/Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
     enzyme_dict = pickle.load(f)
 
 # new_enzyme_dict={}
@@ -584,12 +584,12 @@ with open("../Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
 # enzyme_dict=new_enzyme_dict
 
 # Substrate = os.listdir("/mnt/data2/Chenao/substrate_alphafold_structures")
-substrate_dict = pickle.load(open("../Data_Split/substrate_uniprot_seq_1500_3t1.pkl", "rb"))
+substrate_dict = pickle.load(open("../data/Data_Split/substrate_uniprot_seq_1500_3t1.pkl", "rb"))
 
 
 # Load ESM-2 model
 esmmodel, alphabet = esm.pretrained.esm2_t12_35M_UR50D()
-esmmodel = nn.DataParallel(esmmodel, list(range(0,8)))
+esmmodel = nn.DataParallel(esmmodel, list(range(0,4)))
 batch_converter = alphabet.get_batch_converter()
 esmmodel.eval()
 
@@ -598,7 +598,7 @@ esmmodel = esmmodel.to(device)
 
 Transformer_DE = Transformer_DE(d_model=480, n_heads=num_attention_heads, n_layers=num_transformer_layers,K=K).to(device)
 
-state = torch.load("model_weightes/UniZyme.pt")
+state = torch.load("model_weights/UniZyme.pt")
 new_state_dict = {}
 for k, v in state.items():
     name = k[7:]  # remove `module.`
@@ -616,13 +616,13 @@ del state
 
 
 
-Transformer_DE = nn.DataParallel(Transformer_DE, list(range(0,8)))
+Transformer_DE = nn.DataParallel(Transformer_DE, list(range(0,4)))
 
-zeroshot_A01009 = pickle.load(open("../data/test_A01009_zeroshot.pkl", "rb"))
-zeroshot_M10004 = pickle.load(open("../data/test_M10004_zeroshot.pkl", "rb"))
-test_C14005 = pickle.load(open("../data/test_C14005.pkl", "rb"))
-test_C14003 = pickle.load(open("../data/test_C14003.pkl", "rb"))
-test_M10003 = pickle.load(open("../data/test_M10003.pkl", "rb"))
+zeroshot_A01009 = pickle.load(open("../data/Data_Split/test_A01009_zeroshot.pkl", "rb"))
+zeroshot_M10004 = pickle.load(open("../data/Data_Split/test_M10004_zeroshot.pkl", "rb"))
+test_C14005 = pickle.load(open("../data/Data_Split/test_C14005.pkl", "rb"))
+test_C14003 = pickle.load(open("../data/Data_Split/test_C14003.pkl", "rb"))
+test_M10003 = pickle.load(open("../data/Data_Split/test_M10003.pkl", "rb"))
 
 
 validation_dataset={}
