@@ -20,10 +20,10 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1,0,2,3,4,5,6,7"
 distance_threshold = 8.0
 num_epochs = 10
 learning_rate = 0.0001
-real_batch_size = 40  # 每次批量加载 ESM 特征
+real_batch_size = 40
 train_ratio = 0.8  # 80% of data for training
 num_attention_heads = 2
-num_transformer_layers = 1  # 多层 Attention
+num_transformer_layers = 1
 K=10
 
 random.seed(42)
@@ -39,11 +39,9 @@ class SequenceDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # 获取数据
         entry = self.data[idx]
         key = entry[0]
 
-        # 提取 Uniprot 和 Mernum 序列
         uniprot_name, mernum_name = key.split('_')
         batch_size = 1
 
@@ -88,7 +86,6 @@ class SequenceDataset(Dataset):
 
             # esm_features_padded = esm_features_padded.view(1, esm_features_padded.size(0), esm_features_padded.size(1))
 
-            # 填充距离矩阵和能量矩阵
             if seq_len < max_len:
                 pad_distance = torch.zeros(seq_len, max_len - seq_len)
                 pad_distance_row = torch.zeros(max_len - seq_len, max_len)
@@ -104,10 +101,10 @@ class SequenceDataset(Dataset):
                 distances_padded = distances
                 energy_padded = energy
 
-            distances_padded = distances_padded.unsqueeze(0)  # 增加 batchsize 和 head 维度
+            distances_padded = distances_padded.unsqueeze(0)
             distances_padded = distances_padded.expand(num_attention_heads, -1, -1)
 
-            energy_padded = energy_padded.unsqueeze(0)  # 增加 batchsize 和 head 维度
+            energy_padded = energy_padded.unsqueeze(0)
             energy_padded = energy_padded.expand(num_attention_heads, -1, -1)
 
             energy_padded = energy_padded
@@ -132,7 +129,6 @@ class SequenceDataset(Dataset):
         if success_real==[]:
             return None
 
-        # 使用success_real对数据进行二次筛选
         padded_distances_real = []
         padded_energy_real = []
         activate_padded_labels_real = []
@@ -174,7 +170,7 @@ class SequenceDataset(Dataset):
         cleavage_labels_batch = torch.stack(padded_cleavage_labels_real)
 
 
-        mask = torch.zeros(len(distances_batch), num_attention_heads, max_len, max_len)  # 初始化掩码为全0
+        mask = torch.zeros(len(distances_batch), num_attention_heads, max_len, max_len)
 
         for i,index in enumerate(success_real):
             sub_seq_len = batch_lens[index]
@@ -226,7 +222,7 @@ def create_distance(pdb_file):
     ca_coords = get_ca_coordinates(pdb_file)
     num_nodes = ca_coords.shape[0]
     distances = distance_matrix(ca_coords, ca_coords)
-    # 倒数
+
     distances = 1 / (distances + 1)
     distances = torch.tensor(distances, dtype=torch.float)
     # distances[distances > distance_threshold] = 0  # Apply threshold
@@ -237,28 +233,29 @@ class GaussianParameters(nn.Module):
     def __init__(self, K=10):
         super(GaussianParameters, self).__init__()
         self.K = K
-        self.mu_D_Enzyme = nn.Parameter(torch.randn(K))        # 距离高斯核中心
-        self.sigma_D_Enzyme = nn.Parameter(torch.ones(K))      # 距离高斯核标准差
-        self.b_D_Enzyme = nn.Parameter(torch.zeros(K))         # 距离偏置项
+        self.mu_D_Enzyme = nn.Parameter(torch.randn(K))        # Distance Gaussian Kernel Center
+        self.sigma_D_Enzyme = nn.Parameter(torch.ones(K))      # Distance Gaussian Kernel Standard Deviation
+        self.b_D_Enzyme = nn.Parameter(torch.zeros(K))         # Distance Bias Term
 
-        self.mu_D_Sub = nn.Parameter(torch.randn(K))        # 距离高斯核中心
-        self.sigma_D_Sub = nn.Parameter(torch.ones(K))      # 距离高斯核标准差
-        self.b_D_Sub = nn.Parameter(torch.zeros(K))         # 距离偏置项
+        self.mu_D_Sub = nn.Parameter(torch.randn(K))        # Distance Gaussian Kernel Center
+        self.sigma_D_Sub = nn.Parameter(torch.ones(K))      # Distance Gaussian Kernel Standard Deviation
+        self.b_D_Sub = nn.Parameter(torch.zeros(K))         # Distance Bias Term
 
-        self.mu_E = nn.Parameter(torch.randn(K))        # 能量高斯核中心
-        self.sigma_E = nn.Parameter(torch.ones(K))      # 能量高斯核标准差
-        self.b_E = nn.Parameter(torch.zeros(K))         # 能量偏置项
+        self.mu_E = nn.Parameter(torch.randn(K))        # Energy Gaussian Kernel Center
+        self.sigma_E = nn.Parameter(torch.ones(K))      # Energy Gaussian Kernel Standard Deviation
+        self.b_E = nn.Parameter(torch.zeros(K))         # Energy Bias Term
 
-        # 定义用于Phi计算的线性层（公式5）
+
         self.W_D1 = nn.Linear(K, K)  # [K x K]
         self.W_D2 = nn.Linear(K, 1)  # [K x 1]
 
-        self.mu_activation = nn.Parameter(torch.randn(K))        # 激活位点高斯核中心
-        self.sigma_activation = nn.Parameter(torch.ones(K))      # 激活位点高斯核标准差
-        self.b_activation = nn.Parameter(torch.zeros(K))         # 激活位点偏置项
-        # 定义用于Phi计算的线性层（公式5）
+        self.mu_activation = nn.Parameter(torch.randn(K))        # Activation Site Gaussian Kernel Center
+        self.sigma_activation = nn.Parameter(torch.ones(K))      # Activation Site Gaussian Kernel Standard Deviation
+        self.b_activation = nn.Parameter(torch.zeros(K))         # Activation Site Bias Term
+
         self.W_activation1 = nn.Linear(K, K)  # [K x K]
         self.W_activation2 = nn.Linear(K, 1)  # [K x 1]
+
 
 
 
@@ -276,14 +273,12 @@ class Pool_Cat_MLP(torch.nn.Module):
             nn.Linear(64, 1),
             nn.Sigmoid()
         )
-        #一维卷积
         #self.conv1d = nn.Conv1d(in_channels=2 * d, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.conv1d = nn.Conv1d(in_channels=2*d, out_channels=128, kernel_size=31, stride=1, padding=15)
-        # 定义激活函数和 Dropout
         self.conv_activation = nn.SELU()
         self.conv_dropout = nn.Dropout(p=0.2)
 
-        # 定义全连接层，用于最终的预测
+
         self.fc = nn.Sequential(
             nn.Linear(128, 128),
             nn.SELU(),
@@ -294,23 +289,9 @@ class Pool_Cat_MLP(torch.nn.Module):
         self.gaussian_params = gaussian_params
 
     def forward(self, Enzyme, Substrate, Activate_Site,Activate_Site_f,Enzymes_mask):
-        #softmax
-        # softmax_lambda_weight = F.softmax(lambda_weight, dim=-1)
-        # #对Enzyme基于权重的pool
-        # weighted_Enzyme = softmax_lambda_weight * Enzyme
-        #pooled_Enzyme = weighted_Enzyme.sum(dim=-2)
-        #
-        # #平均池化
-        # Enzymes_mask = Enzymes_mask[:, 0, :, 0]
-        # #根据mask加权Enzyme
-        # Enzymes_length = Enzymes_mask.sum(dim=-1)
-        # Enzymes_mask = Enzymes_mask.unsqueeze(-1).repeat(1, 1, self.d)
-        # pooled_Enzyme = (Enzyme * Enzymes_mask).sum(dim=-2) / Enzymes_length.view(-1, 1)
 
-
-        # 平均池化
         Enzymes_mask = Enzymes_mask[:, 0, :, 0]
-        # 根据mask加权Enzyme
+
         Enzymes_length = Enzymes_mask.sum(dim=-1)
         Enzymes_mask = Enzymes_mask.unsqueeze(-1).repeat(1, 1, self.d)
 
@@ -322,8 +303,6 @@ class Pool_Cat_MLP(torch.nn.Module):
         psi_Activate_Site_f = psi_Activate_Site_f / (
                 torch.sqrt(torch.tensor(2 * math.pi, device=psi_Activate_Site_f.device)) * self.gaussian_params.sigma_activation)
 
-        # 计算Phi_energy_enzyme（公式5）
-        # psi_energy_enzyme_flat = psi_energy_enzyme.view(-1, self.K)  # [B*H*S*S, K]
         psi_Activate_Site_f_flat = psi_Activate_Site_f
         psi_Activate_Site_f_flat = F.gelu(self.gaussian_params.W_activation1(psi_Activate_Site_f_flat))  # [B*H*S*S, K]
         psi_Activate_Site_f = self.gaussian_params.W_activation2(psi_Activate_Site_f_flat)  # [B*H*S*S, 1]
@@ -346,80 +325,27 @@ class Pool_Cat_MLP(torch.nn.Module):
         combined_features = torch.cat((Substrate,pooled_Enzyme), dim=-1)
         # prediction = self.mlp(combined_features)
 
-        #下面进行一维卷积，Enzyme在Substrate上滑动
-        #combined_features = Substrate + pooled_Enzyme  # 形状: (batch, length_sub, d)
-
-        # 转换为 Conv1d 需要的形状: (batch, d, length_sub)
         combined_features = combined_features.permute(0, 2, 1)
 
-        # 应用一维卷积
+
         conv_output = self.conv1d(combined_features)  # (batch, 64, length_sub)
         conv_output = self.conv_activation(conv_output)
         conv_output = self.conv_dropout(conv_output)
 
-        # 转换回 (batch, length_sub, 64)
+
         conv_output = conv_output.permute(0, 2, 1)
 
-        # 通过全连接层进行预测
+
         prediction = self.fc(conv_output)  # (batch, length_sub, 1)
 
         return prediction
-
-#
-# class CrossAttentionWithWeight(torch.nn.Module):
-#     def __init__(self, d):
-#         super(CrossAttentionWithWeight, self).__init__()
-#         self.d = d
-#         # 构建MLP
-#         self.linerq = nn.Sequential(nn.Linear(d, d))
-#         self.linerk = nn.Sequential(nn.Linear(d, d))
-#         self.linerv = nn.Sequential(nn.Linear(d, d))
-#         self.mlp = nn.Sequential(
-#             nn.Linear(d, 128),
-#             nn.Dropout(p=0.3),
-#             nn.ReLU(),
-#             nn.Linear(128, 64),
-#             nn.Dropout(p=0.3),
-#             nn.ReLU(),
-#             nn.Linear(64, 1),
-#             nn.Dropout(p=0.3),
-#             nn.Sigmoid()
-#         )
-#
-#     def forward(self, Q, K, V, lambda_weight):
-#
-#         Q = self.linerq(Q)
-#         K = self.linerk(K)
-#         V = self.linerv(V)
-#
-#
-#
-#         # 计算查询和键的点积
-#         attention_scores = torch.matmul(Q, K.transpose(-2, -1))  # 点积，大小 [N, M]
-#         # 缩放并应用可学习的调节因子
-#         attention_scores = attention_scores / (self.d ** 0.5)  # 缩放
-#
-#
-#         attention_scores *= lambda_weight  # 应用调节因子
-#         # 计算注意力权重
-#         attention_weights = F.softmax(attention_scores, dim=-1)  # softmax，大小 [N, M]
-#         # 计算最终输出
-#         output = torch.matmul(attention_weights, V)  # 加权求和，输出大小 [N, d_v]
-#
-#         prediction = self.mlp(output)
-#
-#         return prediction, attention_weights
-#
-#
-
-
 
 # Define the Transformer model with multi-layer attention
 class ScaledDotProductAttention_Gauss(nn.Module):
     def __init__(self, d_model,gaussian_params, K=10):
         super(ScaledDotProductAttention_Gauss, self).__init__()
         self.d_model = d_model
-        self.K = K  # 高斯核的数量
+        self.K = K
 
         self.gaussian_params = gaussian_params
 
@@ -441,16 +367,14 @@ class ScaledDotProductAttention_Gauss(nn.Module):
         #print(distance_matrix.shape)
 
         if energy_matrix is None:
-            # 计算距离带偏置
+
             distance = distance_matrix + self.gaussian_params.b_D_Sub  # [batch_sub, n_heads, seq, seq]
-            # 计算psi_dist_substrate（公式1）
+
             # [batch_sub, n_heads, seq, seq, K]
             psi_dist = torch.exp(-0.5 * ((distance - self.gaussian_params.mu_D_Sub) / self.gaussian_params.sigma_D_Sub) ** 2)
             psi_dist = psi_dist / (
                         torch.sqrt(torch.tensor(2 * math.pi, device=distance.device)) * self.gaussian_params.sigma_D_Sub)
-            # 计算Phi_dist_substrate（公式5）
-            # 将psi_dist_substrate展平以通过线性层
-            #psi_dist_substrate_flat = psi_dist_substrate.view(-1, self.K)  # [B*H*S*S, K]
+
             psi_dist_flat = psi_dist
             psi_dist_flat = F.gelu(self.gaussian_params.W_D1(psi_dist_flat))  # [B*H*S*S, K]
             psi_dist_flat = self.gaussian_params.W_D2(psi_dist_flat)  # [B*H*S*S, 1]
@@ -460,22 +384,16 @@ class ScaledDotProductAttention_Gauss(nn.Module):
 
 
 
-            # 应用ReLU和适配器层（公式7）
-            #Phi_dist = self.adapter(Phi_dist)
-
-            # 将Phi_dist_substrate添加到scores_substrate（公式6）
             scores = scores + Phi_dist  # [batch_sub, n_heads, seq, seq]
         else:
-            # 计算距离带偏置
             distance = distance_matrix + self.gaussian_params.b_D_Enzyme  # [batch_sub, n_heads, seq, seq]
-            # 计算psi_dist_substrate（公式1）
+
             # [batch_sub, n_heads, seq, seq, K]
             psi_dist = torch.exp(
                 -0.5 * ((distance - self.gaussian_params.mu_D_Enzyme) / self.gaussian_params.sigma_D_Enzyme) ** 2)
             psi_dist = psi_dist / (
                     torch.sqrt(torch.tensor(2 * math.pi, device=distance.device)) * self.gaussian_params.sigma_D_Enzyme)
-            # 计算Phi_dist_substrate（公式5）
-            # 将psi_dist_substrate展平以通过线性层
+
             # psi_dist_substrate_flat = psi_dist_substrate.view(-1, self.K)  # [B*H*S*S, K]
             psi_dist_flat = psi_dist
             psi_dist_flat = F.gelu(self.gaussian_params.W_D1(psi_dist_flat))  # [B*H*S*S, K]
@@ -494,7 +412,6 @@ class ScaledDotProductAttention_Gauss(nn.Module):
             psi_energy = psi_energy / (
                     torch.sqrt(torch.tensor(2 * math.pi, device=psi_energy.device)) * self.gaussian_params.sigma_E)
 
-            # 计算Phi_energy_enzyme（公式5）
             # psi_energy_enzyme_flat = psi_energy_enzyme.view(-1, self.K)  # [B*H*S*S, K]
             psi_energy_flat = psi_energy
             psi_energy_flat = F.gelu(self.gaussian_params.W_D1(psi_energy_flat))  # [B*H*S*S, K]
@@ -502,7 +419,6 @@ class ScaledDotProductAttention_Gauss(nn.Module):
             # Phi_energy_enzyme = Phi_energy_enzyme_flat.view(l//2, n_heads, seq_len, seq_len)  # [batch_enzyme, n_heads, seq, seq]
             Phi_energy = psi_energy_flat.squeeze(-1)  # [batch_enzyme, n_heads, seq, seq]
 
-            # 将Phi_dist_enzyme和Phi_energy_enzyme添加到scores_enzyme（公式6）
             scores = scores + Phi_dist + Phi_energy  # [batch_enzyme, n_heads, seq, seq
 
 
@@ -708,7 +624,7 @@ test_C14005 = pickle.load(open("../data/test_C14005.pkl", "rb"))
 test_C14003 = pickle.load(open("../data/test_C14003.pkl", "rb"))
 test_M10003 = pickle.load(open("../data/test_M10003.pkl", "rb"))
 
-#结合
+
 validation_dataset={}
 validation_dataset.update(zeroshot_A01009)
 validation_dataset.update(zeroshot_M10004)
@@ -782,7 +698,6 @@ with torch.no_grad():
             for i, seq_len in enumerate(batch_lens):
                 esm_features = token_representations[i][1:seq_len + 1, :]
 
-                # 填充 esm_features
                 pad_size = max_len - seq_len
                 if pad_size > 0:
                     pad_esm = torch.zeros(pad_size, esm_features.size(1)).to(device)
@@ -792,11 +707,10 @@ with torch.no_grad():
 
                 padded_esm_features.append(esm_features_padded)
 
-            # 使用success_real对数据进行二次筛选
+
             padded_esm_features_real = []
 
             for each in range(batch_size):
-                # each对应uniprot，each+batch_size对应mernum
                 padded_esm_features_real.append(padded_esm_features[each])
 
             for each in range(batch_size):
@@ -827,7 +741,7 @@ with torch.no_grad():
             cleavage_labels_batch = cleavage_labels_batch.view(-1, max_len)
 
 
-            # 酶位点的loss
+
             loss_active = F.binary_cross_entropy(Activate_Site, activate_labels_batch, reduction="none")
             loss_cleavage = F.binary_cross_entropy(Cleavage_Site, cleavage_labels_batch, reduction="none")
 
@@ -836,7 +750,7 @@ with torch.no_grad():
             loss_active = loss_active * weighted_Enzymes_mask
             loss_active = loss_active.sum() / (Enzymes_mask.sum() + activate_labels_batch.sum()*9)
 
-            # 打印labels_batch为1的output
+
             print("Activate_Site")
             print(Activate_Site)
             print(Activate_Site[activate_labels_batch == 1])
@@ -846,7 +760,7 @@ with torch.no_grad():
             loss_cleavage = loss_cleavage * weighted_Substrate_mask
             loss_cleavage = loss_cleavage.sum() / (Substrate_mask.sum() + cleavage_labels_batch.sum()*9)
 
-            # 打印labels_batch为1的output
+
             print("Cleavage_Site")
             print(Cleavage_Site)
             print(Cleavage_Site[cleavage_labels_batch == 1])
@@ -863,7 +777,6 @@ with torch.no_grad():
 
             validation_loss += eachloaderloss.item()
 
-        #存储output_true、output_pred
         with open("UniZyme"+eachloader_name+"output_true.pkl","wb") as f:
             pickle.dump(output_true,f)
         with open("UniZyme"+eachloader_name+"output_pred.pkl","wb") as f:

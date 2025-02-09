@@ -1,13 +1,20 @@
 import torch
 import esm
-import numpy as np
+import pickle
+import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader, random_split, Dataset
+import torch.nn.functional as F
 from scipy.spatial import distance_matrix
 from Bio.PDB import PDBParser
-import pandas as pd
-import frustratometer
-import argparse
-import sys
+import numpy as np
 import os
+import torch.nn as nn
+import math
+from torch.cuda.amp import autocast, GradScaler
+import pandas as pd
+import random
+
+from pytorchtools import EarlyStopping
 
 # Configuration parameters
 num_attention_heads = 2
@@ -50,7 +57,6 @@ def create_distance(pdb_file):
     ca_coords = get_ca_coordinates(pdb_file)
     num_nodes = ca_coords.shape[0]
     distances = distance_matrix(ca_coords, ca_coords)
-    # 倒数
     distances = 1 / (distances + 1)
     distances = torch.tensor(distances, dtype=torch.float)
     # distances[distances > distance_threshold] = 0  # Apply threshold
@@ -61,26 +67,26 @@ class GaussianParameters(nn.Module):
     def __init__(self, K=10):
         super(GaussianParameters, self).__init__()
         self.K = K
-        self.mu_D_Enzyme = nn.Parameter(torch.randn(K))        # 距离高斯核中心
-        self.sigma_D_Enzyme = nn.Parameter(torch.ones(K))      # 距离高斯核标准差
-        self.b_D_Enzyme = nn.Parameter(torch.zeros(K))         # 距离偏置项
+        self.mu_D_Enzyme = nn.Parameter(torch.randn(K))        # Distance Gaussian Kernel Center
+        self.sigma_D_Enzyme = nn.Parameter(torch.ones(K))      # Distance Gaussian Kernel Standard Deviation
+        self.b_D_Enzyme = nn.Parameter(torch.zeros(K))         # Distance Bias Term
 
-        self.mu_D_Sub = nn.Parameter(torch.randn(K))        # 距离高斯核中心
-        self.sigma_D_Sub = nn.Parameter(torch.ones(K))      # 距离高斯核标准差
-        self.b_D_Sub = nn.Parameter(torch.zeros(K))         # 距离偏置项
+        self.mu_D_Sub = nn.Parameter(torch.randn(K))        # Distance Gaussian Kernel Center
+        self.sigma_D_Sub = nn.Parameter(torch.ones(K))      # Distance Gaussian Kernel Standard Deviation
+        self.b_D_Sub = nn.Parameter(torch.zeros(K))         # Distance Bias Term
 
-        self.mu_E = nn.Parameter(torch.randn(K))        # 能量高斯核中心
-        self.sigma_E = nn.Parameter(torch.ones(K))      # 能量高斯核标准差
-        self.b_E = nn.Parameter(torch.zeros(K))         # 能量偏置项
+        self.mu_E = nn.Parameter(torch.randn(K))        # Energy Gaussian Kernel Center
+        self.sigma_E = nn.Parameter(torch.ones(K))      # Energy Gaussian Kernel Standard Deviation
+        self.b_E = nn.Parameter(torch.zeros(K))         # Energy Bias Term
 
-        # 定义用于Phi计算的线性层（公式5）
+
         self.W_D1 = nn.Linear(K, K)  # [K x K]
         self.W_D2 = nn.Linear(K, 1)  # [K x 1]
 
-        self.mu_activation = nn.Parameter(torch.randn(K))        # 激活位点高斯核中心
-        self.sigma_activation = nn.Parameter(torch.ones(K))      # 激活位点高斯核标准差
-        self.b_activation = nn.Parameter(torch.zeros(K))         # 激活位点偏置项
-        # 定义用于Phi计算的线性层（公式5）
+        self.mu_activation = nn.Parameter(torch.randn(K))        # Activation Site Gaussian Kernel Center
+        self.sigma_activation = nn.Parameter(torch.ones(K))      # Activation Site Gaussian Kernel Standard Deviation
+        self.b_activation = nn.Parameter(torch.zeros(K))         # Activation Site Bias Term
+
         self.W_activation1 = nn.Linear(K, K)  # [K x K]
         self.W_activation2 = nn.Linear(K, 1)  # [K x 1]
 
@@ -100,14 +106,13 @@ class Pool_Cat_MLP(torch.nn.Module):
             nn.Linear(64, 1),
             nn.Sigmoid()
         )
-        #一维卷积
         #self.conv1d = nn.Conv1d(in_channels=2 * d, out_channels=64, kernel_size=3, stride=1, padding=1)
         self.conv1d = nn.Conv1d(in_channels=2*d, out_channels=128, kernel_size=31, stride=1, padding=15)
-        # 定义激活函数和 Dropout
+
         self.conv_activation = nn.SELU()
         self.conv_dropout = nn.Dropout(p=0.2)
 
-        # 定义全连接层，用于最终的预测
+
         self.fc = nn.Sequential(
             nn.Linear(128, 128),
             nn.SELU(),
@@ -118,23 +123,10 @@ class Pool_Cat_MLP(torch.nn.Module):
         self.gaussian_params = gaussian_params
 
     def forward(self, Enzyme, Substrate, Activate_Site,Activate_Site_f,Enzymes_mask):
-        #softmax
-        # softmax_lambda_weight = F.softmax(lambda_weight, dim=-1)
-        # #对Enzyme基于权重的pool
-        # weighted_Enzyme = softmax_lambda_weight * Enzyme
-        #pooled_Enzyme = weighted_Enzyme.sum(dim=-2)
-        #
-        # #平均池化
-        # Enzymes_mask = Enzymes_mask[:, 0, :, 0]
-        # #根据mask加权Enzyme
-        # Enzymes_length = Enzymes_mask.sum(dim=-1)
-        # Enzymes_mask = Enzymes_mask.unsqueeze(-1).repeat(1, 1, self.d)
-        # pooled_Enzyme = (Enzyme * Enzymes_mask).sum(dim=-2) / Enzymes_length.view(-1, 1)
 
 
-        # 平均池化
         Enzymes_mask = Enzymes_mask[:, 0, :, 0]
-        # 根据mask加权Enzyme
+
         Enzymes_length = Enzymes_mask.sum(dim=-1)
         Enzymes_mask = Enzymes_mask.unsqueeze(-1).repeat(1, 1, self.d)
 
@@ -146,7 +138,7 @@ class Pool_Cat_MLP(torch.nn.Module):
         psi_Activate_Site_f = psi_Activate_Site_f / (
                 torch.sqrt(torch.tensor(2 * math.pi, device=psi_Activate_Site_f.device)) * self.gaussian_params.sigma_activation)
 
-        # 计算Phi_energy_enzyme（公式5）
+
         # psi_energy_enzyme_flat = psi_energy_enzyme.view(-1, self.K)  # [B*H*S*S, K]
         psi_Activate_Site_f_flat = psi_Activate_Site_f
         psi_Activate_Site_f_flat = F.gelu(self.gaussian_params.W_activation1(psi_Activate_Site_f_flat))  # [B*H*S*S, K]
@@ -170,21 +162,18 @@ class Pool_Cat_MLP(torch.nn.Module):
         combined_features = torch.cat((Substrate,pooled_Enzyme), dim=-1)
         # prediction = self.mlp(combined_features)
 
-        #下面进行一维卷积，Enzyme在Substrate上滑动
-        #combined_features = Substrate + pooled_Enzyme  # 形状: (batch, length_sub, d)
 
-        # 转换为 Conv1d 需要的形状: (batch, d, length_sub)
         combined_features = combined_features.permute(0, 2, 1)
 
-        # 应用一维卷积
+
         conv_output = self.conv1d(combined_features)  # (batch, 64, length_sub)
         conv_output = self.conv_activation(conv_output)
         conv_output = self.conv_dropout(conv_output)
 
-        # 转换回 (batch, length_sub, 64)
+
         conv_output = conv_output.permute(0, 2, 1)
 
-        # 通过全连接层进行预测
+
         prediction = self.fc(conv_output)  # (batch, length_sub, 1)
 
         return prediction
@@ -195,7 +184,7 @@ class ScaledDotProductAttention_Gauss(nn.Module):
     def __init__(self, d_model,gaussian_params, K=10):
         super(ScaledDotProductAttention_Gauss, self).__init__()
         self.d_model = d_model
-        self.K = K  # 高斯核的数量
+        self.K = K
 
         self.gaussian_params = gaussian_params
 
@@ -217,15 +206,14 @@ class ScaledDotProductAttention_Gauss(nn.Module):
         #print(distance_matrix.shape)
 
         if energy_matrix is None:
-            # 计算距离带偏置
+
             distance = distance_matrix + self.gaussian_params.b_D_Sub  # [batch_sub, n_heads, seq, seq]
-            # 计算psi_dist_substrate（公式1）
+
             # [batch_sub, n_heads, seq, seq, K]
             psi_dist = torch.exp(-0.5 * ((distance - self.gaussian_params.mu_D_Sub) / self.gaussian_params.sigma_D_Sub) ** 2)
             psi_dist = psi_dist / (
                         torch.sqrt(torch.tensor(2 * math.pi, device=distance.device)) * self.gaussian_params.sigma_D_Sub)
-            # 计算Phi_dist_substrate（公式5）
-            # 将psi_dist_substrate展平以通过线性层
+
             #psi_dist_substrate_flat = psi_dist_substrate.view(-1, self.K)  # [B*H*S*S, K]
             psi_dist_flat = psi_dist
             psi_dist_flat = F.gelu(self.gaussian_params.W_D1(psi_dist_flat))  # [B*H*S*S, K]
@@ -236,23 +224,17 @@ class ScaledDotProductAttention_Gauss(nn.Module):
 
 
 
-            # 应用ReLU和适配器层（公式7）
-            #Phi_dist = self.adapter(Phi_dist)
 
-            # 将Phi_dist_substrate添加到scores_substrate（公式6）
             scores = scores + Phi_dist  # [batch_sub, n_heads, seq, seq]
         else:
-            # 计算距离带偏置
             distance = distance_matrix + self.gaussian_params.b_D_Enzyme  # [batch_sub, n_heads, seq, seq]
-            # 计算psi_dist_substrate（公式1）
+
             # [batch_sub, n_heads, seq, seq, K]
             psi_dist = torch.exp(
                 -0.5 * ((distance - self.gaussian_params.mu_D_Enzyme) / self.gaussian_params.sigma_D_Enzyme) ** 2)
             psi_dist = psi_dist / (
                     torch.sqrt(torch.tensor(2 * math.pi, device=distance.device)) * self.gaussian_params.sigma_D_Enzyme)
-            # 计算Phi_dist_substrate（公式5）
-            # 将psi_dist_substrate展平以通过线性层
-            # psi_dist_substrate_flat = psi_dist_substrate.view(-1, self.K)  # [B*H*S*S, K]
+
             psi_dist_flat = psi_dist
             psi_dist_flat = F.gelu(self.gaussian_params.W_D1(psi_dist_flat))  # [B*H*S*S, K]
             psi_dist_flat = self.gaussian_params.W_D2(psi_dist_flat)  # [B*H*S*S, 1]
