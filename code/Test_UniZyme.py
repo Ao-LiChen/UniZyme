@@ -573,7 +573,6 @@ class Transformer_DE(nn.Module):
 
 
 # Load data
-# Enzyme = os.listdir("/home/shuoyan/Chenao/FRUS/Enzyme/pdb_files")
 with open("../data/Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
     enzyme_dict = pickle.load(f)
 
@@ -583,7 +582,6 @@ with open("../data/Data_Split/enzyme_dict_1500_3t1.pkl", "rb") as f:
 #
 # enzyme_dict=new_enzyme_dict
 
-# Substrate = os.listdir("/mnt/data2/Chenao/substrate_alphafold_structures")
 substrate_dict = pickle.load(open("../data/Data_Split/substrate_uniprot_seq_1500_3t1.pkl", "rb"))
 
 
