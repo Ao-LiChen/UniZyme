@@ -8,7 +8,8 @@ This repository contains the code and data for **UniZyme**, a tool designed to p
 ![UniZyme Framework](framework.png)
 
 ## Data and Model Weights
-The datasets and model weights can be found at: [Data and Model Weights](https://zenodo.org/records/14841050). You can find the training, validation, and test splits and model weights for the large-scale baselines presented in the paper under data/Large_Scale_Data_Split.
+The datasets and model weights can be found at: [Data and Model Weights](https://zenodo.org/records/14841050). 
+> **Update:** You can find the training, validation, and test splits and model weights for the large-scale baselines presented in the paper under data/Large_Scale_Data_Split.
 
 ## Dependencies
 Follow the steps below to set up the environment for **UniZyme**:
